@@ -1,0 +1,108 @@
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Sipariş Onayı";
+
+    Atlas.Common.DTOs.OrderDto? order = null;
+    if (ViewBag.OrderData != null)
+    {
+        try
+        {
+            order = JsonSerializer.Deserialize<Atlas.Common.DTOs.OrderDto>(ViewBag.OrderData as string, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch { }
+    }
+}
+
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-check-circle text-success" style="font-size: 5rem;"></i>
+                    </div>
+                    <h2 class="text-success mb-3">Siparişiniz Alındı!</h2>
+                    <p class="lead">Teşekkür ederiz. Siparişiniz başarıyla oluşturuldu.</p>
+
+                    @if (order != null)
+                    {
+                        <hr>
+                        <div class="text-start">
+                            <h5 class="mb-3">Sipariş Detayları</h5>
+                            <div class="row mb-2">
+                                <div class="col-md-4"><strong>Sipariş No:</strong></div>
+                                <div class="col-md-8">@order.Id</div>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-md-4"><strong>Tarih:</strong></div>
+                                <div class="col-md-8">@order.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-md-4"><strong>Durum:</strong></div>
+                                <div class="col-md-8">
+                                    <span class="badge bg-info">@order.Status</span>
+                                </div>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-md-4"><strong>Toplam:</strong></div>
+                                <div class="col-md-8"><strong class="text-primary">@order.Total.ToString("N2") TL</strong></div>
+                            </div>
+
+                            <hr>
+                            <h6 class="mb-3">Sipariş İçeriği</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Ürün</th>
+                                            <th class="text-center">Adet</th>
+                                            <th class="text-end">Fiyat</th>
+                                            <th class="text-end">Toplam</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in order.Items)
+                                        {
+                                            <tr>
+                                                <td>@item.ProductName</td>
+                                                <td class="text-center">@item.Quantity</td>
+                                                <td class="text-end">@item.Price.ToString("N2") TL</td>
+                                                <td class="text-end">@((item.Price * item.Quantity).ToString("N2")) TL</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            @if (order.Payment != null)
+                            {
+                                <hr>
+                                <h6 class="mb-3">Ödeme Bilgileri</h6>
+                                <div class="row mb-2">
+                                    <div class="col-md-4"><strong>Yöntem:</strong></div>
+                                    <div class="col-md-8">@order.Payment.Method</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-4"><strong>Durum:</strong></div>
+                                    <div class="col-md-8">
+                                        <span class="badge bg-success">@order.Payment.Status</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <hr>
+                    <div class="d-grid gap-2">
+                        <a asp-controller="Product" asp-action="Index" class="btn btn-primary">
+                            <i class="fas fa-shopping-bag"></i> Alışverişe Devam Et
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

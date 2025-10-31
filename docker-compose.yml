@@ -1,0 +1,460 @@
+services:
+  # PostgreSQL for User Service
+  postgres-user:
+    image: postgres:15-alpine
+    container_name: atlas-postgres-user
+    environment:
+      POSTGRES_DB: atlas_user
+      POSTGRES_USER: atlasuser
+      POSTGRES_PASSWORD: ChangeThisPassword123!
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-user-data:/var/lib/postgresql/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlasuser -d atlas_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL for Order Service
+  postgres-order:
+    image: postgres:15-alpine
+    container_name: atlas-postgres-order
+    environment:
+      POSTGRES_DB: atlas_order
+      POSTGRES_USER: atlasorder
+      POSTGRES_PASSWORD: ChangeThisPassword123!
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-order-data:/var/lib/postgresql/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlasorder -d atlas_order"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB for Product Service
+  mongodb:
+    image: mongo:7
+    container_name: atlas-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: atlasadmin
+      MONGO_INITDB_ROOT_PASSWORD: ChangeThisPassword123!
+      MONGO_INITDB_DATABASE: atlas_product
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - atlas-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/atlas_product --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Caching
+  redis:
+    image: redis:7-alpine
+    container_name: atlas-redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OpenSearch for Search & Logging
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: atlas-opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_SECURITY_PLUGIN=true
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # OpenSearch Dashboards for Visualization
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.0
+    container_name: atlas-opensearch-dashboards
+    environment:
+      - OPENSEARCH_HOSTS=http://opensearch:9200
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    ports:
+      - "5601:5601"
+    networks:
+      - atlas-network
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # RabbitMQ for Event Bus
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: atlas-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: atlasuser
+      RABBITMQ_DEFAULT_PASS: ChangeThisPassword123!
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Jaeger for Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: atlas-jaeger
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - SPAN_STORAGE_TYPE=memory
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "14250:14250"
+      - "14268:14268"
+      - "14269:14269"
+      - "9411:9411"
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:14269/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # MinIO for Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: atlas-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: atlasadmin
+      MINIO_ROOT_PASSWORD: ChangeThisPassword123!
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # PostgreSQL for Notification Service
+  postgres-notification:
+    image: postgres:15-alpine
+    container_name: atlas-postgres-notification
+    environment:
+      POSTGRES_DB: atlas_notification
+      POSTGRES_USER: atlasnotification
+      POSTGRES_PASSWORD: ChangeThisPassword123!
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-notification-data:/var/lib/postgresql/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlasnotification -d atlas_notification"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # User Service
+  user-service:
+    build:
+      context: .
+      dockerfile: src/UserService/Dockerfile
+    container_name: atlas-user-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-user;Port=5432;Database=atlas_user;Username=atlasuser;Password=ChangeThisPassword123!
+      - ConnectionStrings__Redis=redis:6379
+      - Jwt__Secret=PLACEHOLDER_JWT_SECRET_CHANGE_IN_PRODUCTION_MIN_32_CHARS_LONG_KEY_HERE
+      - Jwt__Issuer=Atlas.UserService
+      - Jwt__Audience=Atlas.Client
+      - OpenSearch__Url=http://opensearch:9200
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=atlasuser
+      - RabbitMQ__Password=ChangeThisPassword123!
+      - RabbitMQ__VirtualHost=/
+      - FrontendUrl=http://localhost:5004
+      - Jaeger__Host=jaeger
+      - Jaeger__Port=6831
+    ports:
+      - "5001:80"
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+  # Product Service
+  product-service:
+    build:
+      context: .
+      dockerfile: src/ProductService/Dockerfile
+    container_name: atlas-product-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__MongoDB=mongodb://atlasadmin:ChangeThisPassword123!@mongodb:27017
+      - MongoDB__DatabaseName=atlas_product
+      - ConnectionStrings__Redis=redis:6379
+      - OpenSearch__Url=http://opensearch:9200
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=atlasuser
+      - RabbitMQ__Password=ChangeThisPassword123!
+      - MinIO__Endpoint=minio:9000
+      - MinIO__AccessKey=atlasadmin
+      - MinIO__SecretKey=ChangeThisPassword123!
+      - MinIO__BucketName=product-images
+      - MinIO__PublicUrl=http://localhost:9000
+      - MinIO__UseSSL=false
+      - Jaeger__Host=jaeger
+      - Jaeger__Port=6831
+    ports:
+      - "5002:80"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+  # Order Service
+  order-service:
+    build:
+      context: .
+      dockerfile: src/OrderService/Dockerfile
+    container_name: atlas-order-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-order;Port=5432;Database=atlas_order;Username=atlasorder;Password=ChangeThisPassword123!
+      - ConnectionStrings__Redis=redis:6379
+      - Jwt__Secret=PLACEHOLDER_JWT_SECRET_CHANGE_IN_PRODUCTION_MIN_32_CHARS_LONG_KEY_HERE
+      - Jwt__Issuer=Atlas.UserService
+      - Jwt__Audience=Atlas.Client
+      - OpenSearch__Url=http://opensearch:9200
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=atlasuser
+      - RabbitMQ__Password=ChangeThisPassword123!
+      - Services__ProductService__Url=http://product-service:80
+      - Jaeger__Host=jaeger
+      - Jaeger__Port=6831
+    ports:
+      - "5003:80"
+    depends_on:
+      postgres-order:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+  # API Gateway
+  apigateway:
+    build:
+      context: .
+      dockerfile: src/ApiGateway/Dockerfile
+    container_name: atlas-apigateway
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - Jwt__Secret=PLACEHOLDER_JWT_SECRET_CHANGE_IN_PRODUCTION_MIN_32_CHARS_LONG_KEY_HERE
+      - Jwt__Issuer=Atlas.UserService
+      - Jwt__Audience=Atlas.Client
+      - OpenSearch__Url=http://opensearch:9200
+      - Jaeger__Host=jaeger
+      - Jaeger__Port=6831
+    ports:
+      - "5000:80"
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - opensearch
+      - jaeger
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+  # Nginx Load Balancer with ModSecurity
+  nginx:
+    image: owasp/modsecurity-crs:nginx-alpine
+    container_name: atlas-nginx
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - ./nginx/atlas-lb.conf:/etc/nginx/templates/conf.d/atlas.conf.template:ro
+      - nginx-logs:/var/log/nginx
+    environment:
+      - BACKEND=http://apigateway:80
+      - BACKEND_WS=ws://apigateway:80
+      - FRONTEND=http://frontend:80
+      - MODSEC_RULE_ENGINE=On
+      - PARANOIA=1
+      - ANOMALY_INBOUND=5
+      - ANOMALY_OUTBOUND=4
+      - PROXY=1
+      - PROXYLOCATION=/api/
+      - NGINX_ALWAYS_TLS_REDIRECT=false
+    networks:
+      - atlas-network
+    depends_on:
+      - frontend
+      - apigateway
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: src/Frontend/Dockerfile
+    container_name: atlas-frontend
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ApiGateway__Url=http://apigateway:80
+    ports:
+      - "5004:80"
+    depends_on:
+      - apigateway
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+  # Notification Service
+  notification-service:
+    build:
+      context: .
+      dockerfile: src/NotificationService/Dockerfile
+    container_name: atlas-notification-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__NotificationDb=Host=postgres-notification;Port=5432;Database=atlas_notification;Username=atlasnotification;Password=ChangeThisPassword123!
+      - OpenSearch__Url=http://opensearch:9200
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=atlasuser
+      - RabbitMQ__Password=ChangeThisPassword123!
+      - Email__SmtpHost=smtp.gmail.com
+      - Email__SmtpPort=587
+      - Email__UseSsl=true
+      - Email__FromEmail=noreply@atlas.local
+      - Email__FromName=Atlas E-Commerce
+      - Sms__Enabled=true
+      - Sms__AccountSid=YOUR_TWILIO_ACCOUNT_SID_HERE
+      - Sms__AuthToken=YOUR_TWILIO_AUTH_TOKEN_HERE
+      - Sms__FromPhoneNumber=YOUR_TWILIO_PHONE_NUMBER_HERE
+      - Jaeger__Host=jaeger
+      - Jaeger__Port=6831
+    ports:
+      - "5005:80"
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+volumes:
+  postgres-user-data:
+  postgres-order-data:
+  postgres-notification-data:
+  mongodb-data:
+  redis-data:
+  opensearch-data:
+  rabbitmq-data:
+  minio-data:
+  nginx-logs:
+
+networks:
+  atlas-network:
+    driver: bridge

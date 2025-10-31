@@ -1,0 +1,107 @@
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Siparişlerim";
+
+    List<Atlas.Common.DTOs.OrderDto>? orders = null;
+    if (ViewBag.OrdersData != null)
+    {
+        try
+        {
+            var ordersResponse = JsonSerializer.Deserialize<JsonElement>(ViewBag.OrdersData as string);
+            if (ordersResponse.TryGetProperty("orders", out var ordersArray))
+            {
+                orders = JsonSerializer.Deserialize<List<Atlas.Common.DTOs.OrderDto>>(
+                    ordersArray.GetRawText(),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+            }
+        }
+        catch { }
+    }
+}
+
+<div class="container my-5">
+    <h2><i class="fas fa-box"></i> Siparişlerim</h2>
+    <hr>
+
+    @if (orders != null && orders.Any())
+    {
+        <div class="row">
+            @foreach (var order in orders)
+            {
+                <div class="col-md-6 mb-3">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><strong>Sipariş #@order.Id.ToString().Substring(0, 8)</strong></span>
+                            <span class="badge bg-info">@order.Status</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-2">
+                                <i class="fas fa-calendar"></i>
+                                <small>@order.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</small>
+                            </p>
+                            <p class="mb-2">
+                                <i class="fas fa-box"></i>
+                                <small>@order.Items.Count ürün</small>
+                            </p>
+                            <p class="mb-3">
+                                <strong>Toplam: @order.Total.ToString("N2") TL</strong>
+                            </p>
+                            @if (order.Payment != null)
+                            {
+                                <p class="mb-2">
+                                    <i class="fas fa-credit-card"></i>
+                                    <small>Ödeme: <span class="badge bg-@(order.Payment.Status == "Success" ? "success" : "warning")">@order.Payment.Status</span></small>
+                                </p>
+                            }
+                            <hr>
+                            <div class="d-flex justify-content-between">
+                                <a href="/Cart/OrderConfirmation?orderId=@order.Id" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i> Detaylar
+                                </a>
+                                @if (order.Status == "Pending" || order.Status == "Processing")
+                                {
+                                    <button class="btn btn-sm btn-danger" onclick="cancelOrder('@order.Id')">
+                                        <i class="fas fa-times"></i> İptal Et
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Henüz siparişiniz bulunmamaktadır.
+            <a asp-controller="Product" asp-action="Index" class="alert-link">Alışverişe başlayın</a>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        function cancelOrder(orderId) {
+            if (!confirm('Siparişi iptal etmek istediğinize emin misiniz?')) {
+                return;
+            }
+
+            fetch(`/Order/Cancel?orderId=${orderId}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    alert(data.message);
+                    location.reload();
+                }
+            })
+            .catch(err => {
+                alert('Bir hata oluştu.');
+                console.error(err);
+            });
+        }
+    </script>
+}

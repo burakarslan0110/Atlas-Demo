@@ -1,0 +1,101 @@
+﻿@model List<Frontend.Models.CategoryDto>
+
+@{
+    ViewData["Title"] = "Ana Sayfa";
+
+    // Icon mapping for categories
+    var categoryIcons = new Dictionary<string, string>
+    {
+        { "elektronik", "fa-laptop" },
+        { "giyim", "fa-tshirt" },
+        { "kitaplar", "fa-book" },
+        { "ev-yasam", "fa-home" },
+        { "spor", "fa-dumbbell" },
+        { "oyuncak", "fa-gamepad" }
+    };
+}
+
+<div class="hero-section bg-primary text-white py-5">
+    <div class="container text-center">
+        <h1 class="display-4 fw-bold">Atlas E-Commerce'a Hoş Geldiniz</h1>
+        <p class="lead">En iyi ürünleri en uygun fiyatlarla keşfedin</p>
+        <a asp-controller="Product" asp-action="Index" class="btn btn-light btn-lg mt-3">
+            <i class="fas fa-shopping-bag"></i> Alışverişe Başla
+        </a>
+    </div>
+</div>
+
+<div class="container my-5">
+    <h2 class="text-center mb-4">Popüler Kategoriler</h2>
+    <div class="row g-4">
+        @if (Model != null && Model.Any())
+        {
+            @foreach (var category in Model)
+            {
+                var icon = categoryIcons.ContainsKey(category.Slug) ? categoryIcons[category.Slug] : "fa-tag";
+                <div class="col-md-3">
+                    <div class="card h-100 shadow-sm category-hover">
+                        @if (!string.IsNullOrEmpty(category.ImageUrl))
+                        {
+                            <img src="@category.ImageUrl" class="card-img-top" alt="@category.Name" style="height: 200px; object-fit: cover;">
+                        }
+                        <div class="card-body text-center">
+                            @if (string.IsNullOrEmpty(category.ImageUrl))
+                            {
+                                <i class="fas @icon fa-3x text-primary mb-3"></i>
+                            }
+                            <h5 class="card-title">@category.Name</h5>
+                            <p class="card-text">@(string.IsNullOrEmpty(category.Description) ? "Geniş ürün yelpazesi" : category.Description)</p>
+                            <a asp-controller="Category" asp-action="Products" asp-route-id="@category.Id" asp-route-slug="@category.Slug" class="btn btn-outline-primary">Keşfet</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="col-12 text-center">
+                <p class="text-muted">Kategori bulunamadı</p>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .category-hover {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .category-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+    }
+</style>
+
+<div class="bg-light py-5">
+    <div class="container">
+        <h2 class="text-center mb-4">Neden Atlas E-Commerce?</h2>
+        <div class="row g-4">
+            <div class="col-md-3 text-center">
+                <i class="fas fa-shipping-fast fa-3x text-primary mb-3"></i>
+                <h5>Hızlı Kargo</h5>
+                <p>Tüm siparişlerde ücretsiz kargo</p>
+            </div>
+            <div class="col-md-3 text-center">
+                <i class="fas fa-shield-alt fa-3x text-primary mb-3"></i>
+                <h5>Güvenli Alışveriş</h5>
+                <p>%100 güvenli ödeme</p>
+            </div>
+            <div class="col-md-3 text-center">
+                <i class="fas fa-undo fa-3x text-primary mb-3"></i>
+                <h5>Kolay İade</h5>
+                <p>14 gün içinde koşulsuz iade</p>
+            </div>
+            <div class="col-md-3 text-center">
+                <i class="fas fa-headset fa-3x text-primary mb-3"></i>
+                <h5>7/24 Destek</h5>
+                <p>Her zaman yanınızdayız</p>
+            </div>
+        </div>
+    </div>
+</div>

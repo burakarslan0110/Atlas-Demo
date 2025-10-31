@@ -1,0 +1,165 @@
+@using Frontend.Models
+@model ProductDto
+
+@{
+    ViewData["Title"] = Model?.Name ?? "Ürün Detay";
+}
+
+<div class="container my-5">
+    @if (Model != null)
+    {
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Ana Sayfa</a></li>
+                <li class="breadcrumb-item"><a asp-controller="Product" asp-action="Index">Ürünler</a></li>
+                @if (Model.Category != null)
+                {
+                    <li class="breadcrumb-item"><a asp-controller="Category" asp-action="Products" asp-route-id="@Model.Category.Id">@Model.Category.Name</a></li>
+                }
+                <li class="breadcrumb-item active" aria-current="page">@Model.Name</li>
+            </ol>
+        </nav>
+
+        <div class="row">
+            <div class="col-md-6">
+                @if (Model.Images.Any())
+                {
+                    <div id="productCarousel" class="carousel slide" data-bs-ride="carousel">
+                        <div class="carousel-inner">
+                            @for (int i = 0; i < Model.Images.Count; i++)
+                            {
+                                <div class="carousel-item @(i == 0 ? "active" : "")">
+                                    <img src="@Model.Images[i]" class="d-block w-100 rounded shadow" alt="@Model.Name" style="height: 500px; object-fit: cover;" onerror="this.onerror=null; this.src='https://via.placeholder.com/600x600?text=Resim+Yok';">
+                                </div>
+                            }
+                        </div>
+                        @if (Model.Images.Count > 1)
+                        {
+                            <button class="carousel-control-prev" type="button" data-bs-target="#productCarousel" data-bs-slide="prev">
+                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Önceki</span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#productCarousel" data-bs-slide="next">
+                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Sonraki</span>
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <img src="https://via.placeholder.com/600x600?text=Resim+Yok" class="img-fluid rounded shadow" alt="@Model.Name">
+                }
+            </div>
+            <div class="col-md-6">
+                <h1 class="mb-3">@Model.Name</h1>
+                <div class="d-flex align-items-center mb-3">
+                    <div class="text-warning me-2">
+                        @for (int i = 1; i <= 5; i++)
+                        {
+                            if (i <= Math.Floor(Model.AvgRating))
+                            {
+                                <i class="fas fa-star"></i>
+                            }
+                            else if (i <= Math.Ceiling(Model.AvgRating) && Model.AvgRating % 1 != 0)
+                            {
+                                <i class="fas fa-star-half-alt"></i>
+                            }
+                            else
+                            {
+                                <i class="far fa-star"></i>
+                            }
+                        }
+                    </div>
+                    <span class="text-muted">(@Model.ReviewCount değerlendirme)</span>
+                </div>
+                <p class="text-muted mb-3">
+                    <i class="fas fa-tag"></i> <strong>Marka:</strong> @Model.Brand
+                    @if (Model.Category != null)
+                    {
+                        <span class="ms-3"><i class="fas fa-folder"></i> <strong>Kategori:</strong> @Model.Category.Name</span>
+                    }
+                </p>
+                <hr>
+                <h3 class="text-primary mb-3">@Model.Price.ToString("N2") TL</h3>
+
+                @if (Model.Tags.Any())
+                {
+                    <div class="mb-3">
+                        @foreach (var tag in Model.Tags)
+                        {
+                            <span class="badge bg-secondary me-1">@tag</span>
+                        }
+                    </div>
+                }
+
+                <p class="mt-4">@Model.Description</p>
+
+                @if (Model.Stock > 0)
+                {
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> <strong>Stokta mevcut</strong> (@Model.Stock adet)
+                    </div>
+
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <form method="post" asp-controller="Cart" asp-action="Add">
+                            <input type="hidden" name="productId" value="@Model.Id" />
+                            <div class="mb-3">
+                                <label class="form-label">Adet:</label>
+                                <div class="input-group" style="max-width: 150px;">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="decrementQuantity()">
+                                        <i class="fas fa-minus"></i>
+                                    </button>
+                                    <input type="number" class="form-control text-center" id="quantity" name="quantity" value="1" min="1" max="@Model.Stock">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="incrementQuantity(@Model.Stock)">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-shopping-cart"></i> Sepete Ekle
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <a asp-controller="Account" asp-action="Login" asp-route-returnUrl="@Context.Request.Path" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sign-in-alt"></i> Sepete eklemek için giriş yapın
+                        </a>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> <strong>Stokta yok</strong>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> Ürün bulunamadı.
+        </div>
+    }
+</div>
+
+<script>
+    function incrementQuantity(max) {
+        const input = document.getElementById('quantity');
+        const currentValue = parseInt(input.value);
+        if (currentValue < max) {
+            input.value = currentValue + 1;
+        }
+    }
+
+    function decrementQuantity() {
+        const input = document.getElementById('quantity');
+        const currentValue = parseInt(input.value);
+        if (currentValue > 1) {
+            input.value = currentValue - 1;
+        }
+    }
+</script>

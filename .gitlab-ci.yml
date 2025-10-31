@@ -1,0 +1,133 @@
+stages:
+  - build
+  - test
+  - docker-build
+  - docker-push
+  - deploy
+
+variables:
+  DOCKER_REGISTRY: registry.gitlab.com
+  DOCKER_IMAGE_PREFIX: $CI_REGISTRY_IMAGE
+
+# Build stage
+build:
+  stage: build
+  image: mcr.microsoft.com/dotnet/sdk:9.0
+  script:
+    - dotnet restore Atlas.sln
+    - dotnet build Atlas.sln --configuration Release --no-restore
+  artifacts:
+    paths:
+      - "*/bin/Release/"
+    expire_in: 1 hour
+  only:
+    - main
+    - develop
+
+# Test stage
+test:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:9.0
+  script:
+    - dotnet test Atlas.sln --configuration Release --no-build --verbosity normal
+  dependencies:
+    - build
+  only:
+    - main
+    - develop
+
+# Docker build - User Service
+docker-build-user:
+  stage: docker-build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t atlas/user-service:$CI_COMMIT_SHORT_SHA -f src/UserService/Dockerfile .
+    - docker tag atlas/user-service:$CI_COMMIT_SHORT_SHA atlas/user-service:latest
+  dependencies:
+    - build
+  only:
+    - main
+
+# Docker build - Product Service
+docker-build-product:
+  stage: docker-build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t atlas/product-service:$CI_COMMIT_SHORT_SHA -f src/ProductService/Dockerfile .
+    - docker tag atlas/product-service:$CI_COMMIT_SHORT_SHA atlas/product-service:latest
+  dependencies:
+    - build
+  only:
+    - main
+
+# Docker build - Order Service
+docker-build-order:
+  stage: docker-build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t atlas/order-service:$CI_COMMIT_SHORT_SHA -f src/OrderService/Dockerfile .
+    - docker tag atlas/order-service:$CI_COMMIT_SHORT_SHA atlas/order-service:latest
+  dependencies:
+    - build
+  only:
+    - main
+
+# Docker build - API Gateway
+docker-build-gateway:
+  stage: docker-build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t atlas/apigateway:$CI_COMMIT_SHORT_SHA -f src/ApiGateway/Dockerfile .
+    - docker tag atlas/apigateway:$CI_COMMIT_SHORT_SHA atlas/apigateway:latest
+  dependencies:
+    - build
+  only:
+    - main
+
+# Docker push
+docker-push:
+  stage: docker-push
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+  script:
+    - docker push atlas/user-service:latest
+    - docker push atlas/product-service:latest
+    - docker push atlas/order-service:latest
+    - docker push atlas/apigateway:latest
+  dependencies:
+    - docker-build-user
+    - docker-build-product
+    - docker-build-order
+    - docker-build-gateway
+  only:
+    - main
+
+# Deploy to K3s
+deploy:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - kubectl config use-context atlas-k3s
+    - kubectl apply -f k3s/infrastructure/
+    - kubectl apply -f k3s/services/
+    - kubectl apply -f k3s/ingress/
+    - kubectl rollout status deployment/user-service -n atlas
+    - kubectl rollout status deployment/product-service -n atlas
+    - kubectl rollout status deployment/order-service -n atlas
+    - kubectl rollout status deployment/apigateway -n atlas
+  dependencies:
+    - docker-push
+  only:
+    - main
+  when: manual

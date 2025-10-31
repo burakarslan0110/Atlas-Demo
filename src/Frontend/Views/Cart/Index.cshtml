@@ -1,0 +1,144 @@
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Sepetim";
+
+    Atlas.Common.DTOs.CartDto? cart = null;
+    if (ViewBag.CartData != null)
+    {
+        try
+        {
+            cart = JsonSerializer.Deserialize<Atlas.Common.DTOs.CartDto>(ViewBag.CartData as string, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch { }
+    }
+}
+
+<div class="container my-5">
+    <h2><i class="fas fa-shopping-cart"></i> Sepetim</h2>
+    <hr>
+
+    @if (cart != null && cart.Items.Any())
+    {
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        @foreach (var item in cart.Items)
+                        {
+                            <div class="row align-items-center mb-3 pb-3 border-bottom">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3" style="min-width: 80px;">
+                                            <img src="@(item.ProductImage ?? "https://via.placeholder.com/80x80/f8f9fa/6c757d?text=Product")"
+                                                 alt="@item.ProductName"
+                                                 class="img-fluid rounded"
+                                                 style="max-height: 80px; object-fit: cover;"
+                                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/80x80/f8f9fa/6c757d?text=Product';">
+                                        </div>
+                                        <div>
+                                            <h5 class="mb-1">@item.ProductName</h5>
+                                            <p class="text-muted mb-0">Birim Fiyat: @item.Price.ToString("N2") TL</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="input-group input-group-sm">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity('@item.ProductId', @(item.Quantity - 1))">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                        <input type="text" class="form-control text-center" value="@item.Quantity" readonly>
+                                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity('@item.ProductId', @(item.Quantity + 1))">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-2 text-center">
+                                    <strong>@item.Subtotal.ToString("N2") TL</strong>
+                                </div>
+                                <div class="col-md-1 text-center">
+                                    <button class="btn btn-sm btn-danger" onclick="removeItem('@item.ProductId')" title="Sepetten Kaldır">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Sipariş Özeti</h5>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Ara Toplam:</span>
+                            <strong>@cart.Total.ToString("N2") TL</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Kargo:</span>
+                            <strong>Ücretsiz</strong>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <h5>Toplam:</h5>
+                            <h5 class="text-primary">@cart.Total.ToString("N2") TL</h5>
+                        </div>
+                        <a asp-controller="Cart" asp-action="Checkout" class="btn btn-primary w-100 mb-2">
+                            <i class="fas fa-credit-card"></i> Ödemeye Geç
+                        </a>
+                        <a asp-controller="Product" asp-action="Index" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-shopping-bag"></i> Alışverişe Devam Et
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Sepetiniz boş. <a asp-controller="Product" asp-action="Index">Alışverişe başlayın</a>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        function updateQuantity(productId, quantity) {
+            if (quantity < 1) {
+                if (!confirm('Ürünü sepetten kaldırmak istiyor musunuz?')) {
+                    return;
+                }
+                removeItem(productId);
+                return;
+            }
+
+            fetch(`/Cart/UpdateQuantity?productId=${productId}&quantity=${quantity}`, {
+                method: 'POST'
+            })
+            .then(() => location.reload())
+            .catch(err => {
+                alert('Bir hata oluştu');
+                console.error(err);
+            });
+        }
+
+        function removeItem(productId) {
+            if (!confirm('Ürünü sepetten kaldırmak istediğinize emin misiniz?')) {
+                return;
+            }
+
+            fetch(`/Cart/Remove?productId=${productId}`, {
+                method: 'POST'
+            })
+            .then(() => location.reload())
+            .catch(err => {
+                alert('Bir hata oluştu');
+                console.error(err);
+            });
+        }
+    </script>
+}

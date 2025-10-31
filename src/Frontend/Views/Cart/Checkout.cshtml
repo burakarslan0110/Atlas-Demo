@@ -1,0 +1,102 @@
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Ödeme";
+
+    Atlas.Common.DTOs.CartDto? cart = null;
+    if (ViewBag.CartData != null)
+    {
+        try
+        {
+            cart = JsonSerializer.Deserialize<Atlas.Common.DTOs.CartDto>(ViewBag.CartData as string, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch { }
+    }
+}
+
+<div class="container my-5">
+    <h2><i class="fas fa-credit-card"></i> Ödeme</h2>
+    <hr>
+
+    @if (cart != null && cart.Items.Any())
+    {
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Sipariş Özeti</h5>
+                        <hr>
+                        @foreach (var item in cart.Items)
+                        {
+                            <div class="row align-items-center mb-3 pb-3 border-bottom">
+                                <div class="col-md-8">
+                                    <h6 class="mb-1">@item.ProductName</h6>
+                                    <p class="text-muted mb-0">Adet: @item.Quantity × @item.Price.ToString("N2") TL</p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <strong>@item.Subtotal.ToString("N2") TL</strong>
+                                </div>
+                            </div>
+                        }
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h5>Toplam:</h5>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <h5 class="text-primary">@cart.Total.ToString("N2") TL</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Ödeme Bilgileri</h5>
+                        <hr>
+                        <form asp-controller="Cart" asp-action="PlaceOrder" method="post">
+                            <div class="mb-3">
+                                <label class="form-label">E-posta Adresi *</label>
+                                <input type="email" name="email" class="form-control" placeholder="ornek@email.com" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">İsim Soyisim *</label>
+                                <input type="text" name="userName" class="form-control" placeholder="Adınız Soyadınız" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Telefon Numarası (SMS için)</label>
+                                <input type="tel" name="phoneNumber" class="form-control" placeholder="+905539283582">
+                                <small class="text-muted">Örn: +905539283582</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Ödeme Yöntemi</label>
+                                <select name="paymentMethod" class="form-select">
+                                    <option value="credit_card">Kredi Kartı</option>
+                                    <option value="debit_card">Banka Kartı</option>
+                                    <option value="bank_transfer">Havale/EFT</option>
+                                </select>
+                            </div>
+                            <div class="alert alert-info">
+                                <small><i class="fas fa-info-circle"></i> Bu demo bir uygulamadır. Gerçek ödeme işlemi yapılmamaktadır.</small>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-check"></i> Siparişi Tamamla
+                            </button>
+                            <a asp-controller="Cart" asp-action="Index" class="btn btn-outline-secondary w-100 mt-2">
+                                <i class="fas fa-arrow-left"></i> Sepete Dön
+                            </a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> Sepetiniz boş. <a asp-controller="Product" asp-action="Index">Alışverişe başlayın</a>
+        </div>
+    }
+</div>

@@ -1,0 +1,41 @@
+@*
+    Alert Component - Displays success, error, warning, and info messages
+    Usage:
+    @if (TempData["Success"] != null) { await Html.RenderPartialAsync("_AlertPartial", new { Type = "success", Message = TempData["Success"] }); }
+*@
+
+@model dynamic
+
+@{
+    var type = ViewData["Type"]?.ToString() ?? "info";
+    var message = ViewData["Message"]?.ToString() ?? "";
+    var dismissible = ViewData["Dismissible"]?.ToString() ?? "true";
+
+    var alertClass = type switch
+    {
+        "success" => "alert-success",
+        "error" => "alert-danger",
+        "warning" => "alert-warning",
+        _ => "alert-info"
+    };
+
+    var icon = type switch
+    {
+        "success" => "fa-check-circle",
+        "error" => "fa-exclamation-circle",
+        "warning" => "fa-exclamation-triangle",
+        _ => "fa-info-circle"
+    };
+}
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @alertClass @(dismissible == "true" ? "alert-dismissible fade show" : "")" role="alert">
+        <i class="fas @icon me-2"></i>
+        <span>@message</span>
+        @if (dismissible == "true")
+        {
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        }
+    </div>
+}

@@ -1,0 +1,75 @@
+@using Frontend.Models
+@model List<CategoryDto>
+
+@{
+    ViewData["Title"] = "Kategoriler";
+}
+
+<div class="container my-5">
+    <h2 class="mb-4">Tüm Kategoriler</h2>
+
+    @if (Model?.Any() == true)
+    {
+        <div class="row g-4">
+            @foreach (var category in Model.Where(c => c.ParentId == null))
+            {
+                <div class="col-md-3">
+                    <a asp-action="Products" asp-route-id="@category.Id" asp-route-slug="@category.Slug" class="text-decoration-none">
+                        <div class="card h-100 shadow-sm category-card">
+                            @if (!string.IsNullOrEmpty(category.ImageUrl))
+                            {
+                                <img src="@category.ImageUrl" class="card-img-top category-image" alt="@category.Name">
+                            }
+                            else
+                            {
+                                <div class="card-img-top category-image-placeholder d-flex align-items-center justify-content-center bg-light">
+                                    <i class="fas fa-folder fa-3x text-secondary"></i>
+                                </div>
+                            }
+                            <div class="card-body text-center">
+                                <h5 class="card-title">@category.Name</h5>
+                                @if (!string.IsNullOrEmpty(category.Description))
+                                {
+                                    <p class="card-text text-muted small">@category.Description</p>
+                                }
+                                @if (category.Children.Any())
+                                {
+                                    <p class="card-text text-primary small fw-bold">@category.Children.Count alt kategori</p>
+                                }
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Kategori bulunamadı.
+        </div>
+    }
+</div>
+
+<style>
+    .category-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        overflow: hidden;
+    }
+
+    .category-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+    }
+
+    .category-image {
+        height: 200px;
+        object-fit: cover;
+        width: 100%;
+    }
+
+    .category-image-placeholder {
+        height: 200px;
+        width: 100%;
+    }
+</style>

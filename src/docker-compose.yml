@@ -1,0 +1,268 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for User Service
+  postgres-user:
+    image: postgres:15-alpine
+    container_name: atlas-postgres-user
+    environment:
+      POSTGRES_DB: atlas_user
+      POSTGRES_USER: atlasuser
+      POSTGRES_PASSWORD: ChangeThisPassword123!
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-user-data:/var/lib/postgresql/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlasuser -d atlas_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL for Order Service
+  postgres-order:
+    image: postgres:15-alpine
+    container_name: atlas-postgres-order
+    environment:
+      POSTGRES_DB: atlas_order
+      POSTGRES_USER: atlasorder
+      POSTGRES_PASSWORD: ChangeThisPassword123!
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-order-data:/var/lib/postgresql/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atlasorder -d atlas_order"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB for Product Service
+  mongodb:
+    image: mongo:7
+    container_name: atlas-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: atlasadmin
+      MONGO_INITDB_ROOT_PASSWORD: ChangeThisPassword123!
+      MONGO_INITDB_DATABASE: atlas_product
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+      - ../scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - atlas-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/atlas_product --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Caching
+  redis:
+    image: redis:7-alpine
+    container_name: atlas-redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OpenSearch for Search & Logging
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: atlas-opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_SECURITY_PLUGIN=true
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # RabbitMQ for Event Bus
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: atlas-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: atlasuser
+      RABBITMQ_DEFAULT_PASS: ChangeThisPassword123!
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - atlas-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # User Service
+  user-service:
+    build:
+      context: ..
+      dockerfile: src/UserService/Dockerfile
+    container_name: atlas-user-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-user;Port=5432;Database=atlas_user;Username=atlasuser;Password=ChangeThisPassword123!
+      - ConnectionStrings__Redis=redis:6379
+      - Jwt__Secret=PLACEHOLDER_JWT_SECRET_CHANGE_IN_PRODUCTION_MIN_32_CHARS_LONG_KEY_HERE
+      - Jwt__Issuer=Atlas.UserService
+      - Jwt__Audience=Atlas.Client
+      - OpenSearch__Url=http://opensearch:9200
+    ports:
+      - "5001:80"
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+  # Product Service
+  product-service:
+    build:
+      context: ..
+      dockerfile: src/ProductService/Dockerfile
+    container_name: atlas-product-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__MongoDB=mongodb://atlasadmin:ChangeThisPassword123!@mongodb:27017
+      - MongoDB__DatabaseName=atlas_product
+      - ConnectionStrings__Redis=redis:6379
+      - OpenSearch__Url=http://opensearch:9200
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=atlasuser
+      - RabbitMQ__Password=ChangeThisPassword123!
+    ports:
+      - "5002:80"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+  # Order Service
+  order-service:
+    build:
+      context: ..
+      dockerfile: src/OrderService/Dockerfile
+    container_name: atlas-order-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-order;Port=5432;Database=atlas_order;Username=atlasorder;Password=ChangeThisPassword123!
+      - ConnectionStrings__Redis=redis:6379
+      - Jwt__Secret=PLACEHOLDER_JWT_SECRET_CHANGE_IN_PRODUCTION_MIN_32_CHARS_LONG_KEY_HERE
+      - Jwt__Issuer=Atlas.UserService
+      - Jwt__Audience=Atlas.Client
+      - OpenSearch__Url=http://opensearch:9200
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=atlasuser
+      - RabbitMQ__Password=ChangeThisPassword123!
+      - Services__ProductService__Url=http://product-service:80
+    ports:
+      - "5003:80"
+    depends_on:
+      postgres-order:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+  # API Gateway
+  apigateway:
+    build:
+      context: ..
+      dockerfile: src/ApiGateway/Dockerfile
+    container_name: atlas-apigateway
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - Jwt__Secret=PLACEHOLDER_JWT_SECRET_CHANGE_IN_PRODUCTION_MIN_32_CHARS_LONG_KEY_HERE
+      - Jwt__Issuer=Atlas.UserService
+      - Jwt__Audience=Atlas.Client
+      - OpenSearch__Url=http://opensearch:9200
+    ports:
+      - "5000:80"
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - opensearch
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ..
+      dockerfile: src/Frontend/Dockerfile
+    container_name: atlas-frontend
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ApiGateway__Url=http://apigateway:80
+    ports:
+      - "5004:80"
+    depends_on:
+      - apigateway
+    networks:
+      - atlas-network
+    restart: unless-stopped
+
+volumes:
+  postgres-user-data:
+  postgres-order-data:
+  mongodb-data:
+  redis-data:
+  opensearch-data:
+  rabbitmq-data:
+
+networks:
+  atlas-network:
+    driver: bridge
