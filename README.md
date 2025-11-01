@@ -4,10 +4,6 @@
 
 > **⚠️ ÖNEMLİ:** Bu proje, Türk Telekom Bulut Bilişim Kampı Final Projesi kapsamında geliştirilmiş bir **DEMO uygulamasıdır**. Eğitim ve öğrenme amaçlıdır.
 
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-Demo-yellow.svg)](LICENSE)
-
 ## 📋 İçindekiler
 
 - [Proje Hakkında](#-proje-hakkında)
@@ -723,129 +719,6 @@ dotnet ef database update
 
 MongoDB için migration'lar `scripts/mongo-init.js` dosyasında tanımlanır ve container başlangıcında otomatik çalışır.
 
-### Test Yazma
-
-```csharp
-// src/UserService.Tests/AuthControllerTests.cs
-public class AuthControllerTests
-{
-    [Fact]
-    public async Task Register_ValidUser_ReturnsOk()
-    {
-        // Arrange
-        var mockService = new Mock<IAuthService>();
-        var controller = new AuthController(mockService.Object);
-
-        // Act
-        var result = await controller.Register(new RegisterRequest { ... });
-
-        // Assert
-        Assert.IsType<OkObjectResult>(result);
-    }
-}
-```
-
-Testleri çalıştırma:
-```bash
-dotnet test
-```
-
----
-
-## 🐛 Sorun Giderme
-
-### Container Başlamıyor
-
-**Sorun:** `docker-compose up` sonrası bazı container'lar hata veriyor.
-
-**Çözüm:**
-1. Logları kontrol edin:
-   ```bash
-   docker-compose logs [service-name]
-   ```
-2. Container'ı yeniden başlatın:
-   ```bash
-   docker-compose restart [service-name]
-   ```
-3. Gerekirse yeniden build edin:
-   ```bash
-   docker-compose build --no-cache [service-name]
-   docker-compose up -d [service-name]
-   ```
-
-### Port Çakışması
-
-**Sorun:** `Bind for 0.0.0.0:5432 failed: port is already allocated`
-
-**Çözüm:**
-1. Portun kullanımda olup olmadığını kontrol edin:
-   ```bash
-   # Windows
-   netstat -ano | findstr :5432
-
-   # Linux/Mac
-   lsof -i :5432
-   ```
-2. `docker-compose.yml` dosyasında port numarasını değiştirin:
-   ```yaml
-   ports:
-     - "5435:5432"  # Dış port değiştirildi
-   ```
-
-### Servisler Arası İletişim Hatası
-
-**Sorun:** User Service, Product Service'e erişemiyor.
-
-**Çözüm:**
-1. Network kontrolü:
-   ```bash
-   docker network ls
-   docker network inspect atlas_atlas-network
-   ```
-2. Service discovery için container isimlerini kullanın (localhost değil):
-   ```csharp
-   // ❌ Yanlış
-   var url = "http://localhost:5002";
-
-   // ✅ Doğru
-   var url = "http://product-service:80";
-   ```
-
-### Database Connection Hatası
-
-**Sorun:** `Could not connect to database`
-
-**Çözüm:**
-1. Database container'ının healthy olduğundan emin olun:
-   ```bash
-   docker-compose ps postgres-user
-   ```
-2. Connection string'i kontrol edin:
-   ```bash
-   docker-compose exec user-service printenv ConnectionStrings__DefaultConnection
-   ```
-3. Health check'in geçtiğini bekleyin:
-   ```bash
-   docker-compose logs postgres-user
-   ```
-
-### High Memory Usage
-
-**Sorun:** Docker 8GB+ RAM kullanıyor.
-
-**Çözüm:**
-1. Kullanılmayan servisleri durdurun:
-   ```bash
-   docker-compose stop jaeger opensearch-dashboards
-   ```
-2. Java heap size'ı azaltın (OpenSearch):
-   ```yaml
-   environment:
-     - OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m  # 512m yerine
-   ```
-3. Docker Desktop'ta memory limit ayarlayın:
-   Settings → Resources → Memory → 8GB
-
 ---
 
 ## 📚 Kaynaklar ve Referanslar
@@ -871,7 +744,7 @@ dotnet test
 ## 🤝 Katkıda Bulunanlar
 
 ### Proje Sahibi
-- **Burak Arslan** - [GitHub](https://github.com/username)
+- **Burak Arslan** - [GitHub](https://github.com/burakarslan0110)
 
 ### Roller
 - 🔧 **Operasyon**: Docker containerization, CI/CD, monitoring setup
@@ -890,13 +763,5 @@ Bu proje bir **demo/eğitim projesidir** ve MIT lisansı altında lisanslanmış
 ---
 
 <div align="center">
-
-**Atlas E-Commerce Platform**
-
-Monolitten Mikrservise: Modern E-Ticaret Altyapısı
-
-⭐ Beğendiyseniz projeye yıldız vermeyi unutmayın!
-
-[📖 Dokümantasyon](#) | [🐛 Sorun Bildir](#) | [💬 Tartışma](#)
 
 </div>
